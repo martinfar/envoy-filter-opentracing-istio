@@ -11,7 +11,7 @@
 ---
 
 
-## Change Log Level
+## Change Log Level Istio Proxy
 
 ```
 kubectl exec $(kubectl get pod --selector app=istio-ingressgateway --output jsonpath='{.items[0].metadata.name}' --namespace istio-system) --namespace istio-system -c istio-proxy -- curl -X POST http://localhost:15000/logging?level=error
