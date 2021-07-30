@@ -1,0 +1,22 @@
+kind: Ingress
+apiVersion: extensions/v1beta1
+metadata:
+  name: kiali-ingress
+  namespace: istio-system
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-http
+spec:
+  tls:
+    - hosts:
+        - kiali.kub.vatrox.ml
+      secretName: kiali-tls
+  rules:
+    - host: kiali.kub.vatrox.ml
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              serviceName: kiali
+              servicePort: 9090
