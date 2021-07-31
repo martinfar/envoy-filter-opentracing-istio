@@ -24,6 +24,31 @@ spec:
        typed_config:
          "@type": "type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua"
          inlineCode: |
+            function version()
+                return "v1"
+            end
+            function log(handle, value)
+                handle:logWarn(version() .. ': ' .. value)
+            end
+
+            -- dump a lua object into a string for logging
+            function dump(o)
+              if type(o) == 'table' then
+                  local s = '{ '
+                  for k,v in pairs(o) do
+                    if type(k) ~= 'number' then k = '"'..k..'"' end
+                    s = s .. '['..k..'] = ' .. dump(v) .. ','
+                  end
+                  return s .. '} '
+              else
+                  return tostring(o)
+              end
+            end
+
+
+
+
+
             function envoy_on_request(request_handle)
                 local h = "Hello"
                 local w = "World"
@@ -35,29 +60,49 @@ spec:
                     end
                 end
                 try(function()
-                    local bod = request_handle:body()
-                    res = tostring(bod)
-                    error('pepe')
+                    local function is_not_empty(s)
+                      return s ~= nil 
+                    end
+                    local body = request_handle:body()
+                    request_handle:logWarn(type(body))
+
+                    local request_body_buffer = request_handle:body()
+                    if(request_body_buffer == nil)
+                    then
+                      request_handle:streamInfo():dynamicMetadata():set("envoy.lua", "requestBody", "-")
+                    else
+                      local request_body_data = request_body_buffer:getBytes(0, request_body_buffer:length())
+                      request_handle:logWarn(request_body_data) 
+                      request_handle:streamInfo():dynamicMetadata():set("envoy.lua", "requestBody", request_body_data)
+                    end
+                    if is_not_empty(body) then
+                      result = tostring(body)
+                      request_handle:logWarn(result) 
+                    end
                   end, function(e)
                     request_handle:logWarn("salio mal") 
                     request_handle:logWarn(error(e)) 
                   end)
 
-                local function is_not_empty(s)
-                  return s ~= nil 
-                end
-                local body = request_handle:body()
-                
-                if is_not_empty(body) then
-                  result = tostring(body)
-                  request_handle:logWarn(result) 
-                end
 
-                -- request_handle:logDebug(result)                
+
+                log(request_handle, "START DISPLAYING REQUEST HEADERS")
+                local log_headers = request_handle:headers()
+                for key, value in pairs(log_headers) do
+                  log(request_handle,  "header key: " .. dump(key) .. ", header value: " .. dump(value))
+                end
+                log(request_handle, "END DISPLAYING REQUEST HEADERS")
+              
                 request_handle:headers():add("authorization", "it works!")
                 request_handle:logWarn(" ========= Hola ========== ")
             end
             function envoy_on_response(response_handle)
+                  log(response_handle, "START DISPLAYING REQUEST HEADERS")
+                  local log_headers = response_handle:headers()
+                  for key, value in pairs(log_headers) do
+                    log(response_handle,  "header key: " .. dump(key) .. ", header value: " .. dump(value))
+                  end
+                  log(response_handle, "END DISPLAYING REQUEST HEADERS")            
                   filter_name = "ENVOY"
                   response_handle:headers():add("my_Filter", filter_name)
                   local function is_not_empty(s)
