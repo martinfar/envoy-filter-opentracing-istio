@@ -28,9 +28,31 @@ spec:
                 local h = "Hello"
                 local w = "World"
                 print(h..w)
+                function try(f, catch_f)
+                    local status, exception = pcall(f)
+                    if not status then
+                      catch_f(exception)
+                    end
+                end
+                try(function()
+                    local bod = request_handle:body()
+                    res = tostring(bod)
+                    error('pepe')
+                  end, function(e)
+                    request_handle:logWarn("salio mal") 
+                    request_handle:logWarn(error(e)) 
+                  end)
 
+                local function is_not_empty(s)
+                  return s ~= nil 
+                end
                 local body = request_handle:body()
-                result = tostring(body)
+                
+                if is_not_empty(body) then
+                  result = tostring(body)
+                  request_handle:logWarn(result) 
+                end
+
                 -- request_handle:logDebug(result)                
                 request_handle:headers():add("authorization", "it works!")
                 request_handle:logWarn(" ========= Hola ========== ")
@@ -38,5 +60,14 @@ spec:
             function envoy_on_response(response_handle)
                   filter_name = "ENVOY"
                   response_handle:headers():add("my_Filter", filter_name)
+                  local function is_not_empty(s)
+                    return s ~= nil 
+                  end
+                  local body = response_handle:body()
+                  
+                  if is_not_empty(body) then
+                    result = tostring(body)
+                    response_handle:logWarn(result) 
+                  end                  
                   response_handle:logWarn(" ========= XXXXX ========== ")
             end
