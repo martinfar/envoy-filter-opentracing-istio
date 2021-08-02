@@ -97,6 +97,20 @@ spec:
                       else
                       
                     end
+                    if(tostring(key) == "date")
+                      then
+                          s=dump(value)
+                          p="%a+, (%d+) (%a+) (%d+) (%d+):(%d+):(%d+) GMT"
+                          day,month,year,hour,min,sec=s:match(p)
+                          MON={Jan=1,Feb=2,Mar=3,Apr=4,May=5,Jun=6,Jul=7,Aug=8,Sep=9,Oct=10,Nov=11,Dec=12}
+                          month=MON[month]
+                          offset=os.time()-os.time(os.date("!*t"))
+                          print(os.time({day=day,month=month,year=year,hour=hour,min=min,sec=sec})+offset)
+                      else
+                      
+                    end
+
+
                 end
                 log(request_handle, "END DISPLAYING REQUEST HEADERS")
               
