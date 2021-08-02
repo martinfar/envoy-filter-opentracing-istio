@@ -46,14 +46,8 @@ spec:
               end
             end
 
-
-
-
-
             function envoy_on_request(request_handle)
-                local h = "Hello"
-                local w = "World"
-                print(h..w)
+
                 function try(f, catch_f)
                     local status, exception = pcall(f)
                     if not status then
@@ -84,6 +78,25 @@ spec:
                 local log_headers = request_handle:headers()
                 for key, value in pairs(log_headers) do
                   log(request_handle,  "header key: " .. dump(key) .. ", header value: " .. dump(value))
+
+
+                    if(tostring(key) == "x-b3-traceid")
+                      then
+                        print("==============Trace ID================"..tostring(key).."   "..dump(value) )
+                      else
+                      
+                    end
+
+                    if(tostring(key) == "x-request-id")
+                      then
+                        request_id = tostring(value)
+                        request_id = request_id:gsub("%-", "")
+                        request_sub = request_id:sub(1, 16)
+                        
+                        print("==============request_id================"..tostring(key).."   "..request_sub )
+                      else
+                      
+                    end
                 end
                 log(request_handle, "END DISPLAYING REQUEST HEADERS")
               
