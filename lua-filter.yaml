@@ -2,15 +2,16 @@ apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
   name: lua-filter
-  namespace: istio-system
+  namespace: demo1
 spec:
   workloadSelector:
     labels:
-      istio: ingressgateway
+      #istio: ingressgateway
+      app: productpage
   configPatches:
   - applyTo: HTTP_FILTER
     match:
-      context: GATEWAY
+      context: SIDECAR_INBOUND
       listener:
         filterChain:
           filter:
@@ -60,25 +61,18 @@ spec:
                     end
                 end
                 try(function()
-                    local function is_not_empty(s)
-                      return s ~= nil 
-                    end
                     local body = request_handle:body()
                     request_handle:logWarn(type(body))
 
                     local request_body_buffer = request_handle:body()
                     if(request_body_buffer == nil)
                     then
-                      request_handle:streamInfo():dynamicMetadata():set("envoy.lua", "requestBody", "-")
+                    -- nil boby
                     else
                       local request_body_data = request_body_buffer:getBytes(0, request_body_buffer:length())
                       request_handle:logWarn(request_body_data) 
-                      request_handle:streamInfo():dynamicMetadata():set("envoy.lua", "requestBody", request_body_data)
                     end
-                    if is_not_empty(body) then
-                      result = tostring(body)
-                      request_handle:logWarn(result) 
-                    end
+
                   end, function(e)
                     request_handle:logWarn("salio mal") 
                     request_handle:logWarn(error(e)) 
@@ -103,8 +97,8 @@ spec:
                     log(response_handle,  "header key: " .. dump(key) .. ", header value: " .. dump(value))
                   end
                   log(response_handle, "END DISPLAYING REQUEST HEADERS")            
-                  filter_name = "ENVOY"
-                  response_handle:headers():add("my_Filter", filter_name)
+                  filter_name = "Personal"
+                  response_handle:headers():add("nuevo_filtro", filter_name)
                   local function is_not_empty(s)
                     return s ~= nil 
                   end
