@@ -197,7 +197,7 @@ spec:
                       {
                        [":method"] = "POST",
                        [":path"] = "/api/v2/spans",
-                       [":authority"] = "zipkin.istio-system",
+                       [":authority"] = "jaeger_cluster",
                        ["Content-Type"] = "application/json"
                       },
                       span_info,
