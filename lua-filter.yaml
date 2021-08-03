@@ -155,7 +155,7 @@ spec:
                     id_number = request_sub
                     print("=========== ID ==============="..id_number)
                     print("=========== Payload ===========".. (payload_msj or "none") )
-                    clean_payload= payload_msj:gsub("[\n\r]", " ")
+                    clean_payload= payload_msj:gsub("[\r]", " ")
                     variable_list= {idNumber = id_number,
                           traceId = trace_id,
                           parentId = span_id,
