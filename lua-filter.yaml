@@ -45,184 +45,187 @@ spec:
        typed_config:
          "@type": "type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua"
          inlineCode: |
-          local start_time
-          function version() return "v1" end
-          function log(handle, value) handle:logWarn(version() .. ': ' .. value) end
-          
-          -- dump a lua object into a string for logging
-          function dump(o)
-              if type(o) == 'table' then
-                  local s = '{ '
-                  for k, v in pairs(o) do
-                      if type(k) ~= 'number' then k = '"' .. k .. '"' end
-                      s = s .. '[' .. k .. '] = ' .. dump(v) .. ','
-                  end
-                  return s .. '} '
-              else
-                  return tostring(o)
-              end
-          end
-          
-          function replace_vars(s, variable_list)
-              -- Allow replace_vars{str, vars} syntax as well as replace_vars(str, {vars})
-              if not variable_list then return s end
-              local f = function(x)
-                  return tostring(variable_list[x] or variable_list[tonumber(x)] or "{" .. x .. "}")
-              end
-              return (s:gsub("<(.-)>", f))
-          end
-          
-          function envoy_on_request(request_handle)
-          
-              function try(f, catch_f)
-                  local status, exception = pcall(f)
-                  if not status then catch_f(exception) end
-              end
-              try(function()
-          
-                  start_time = os.clock()
-          
-                  local body = request_handle:body()
-                  request_handle:logWarn(type(body))
-          
-                  local payload_msj
-          
-                  request_body_buffer = request_handle:body()
-                  if (request_body_buffer == nil) then
-                      -- nil boby
-                  else
-                      payload_msj = request_body_buffer:getBytes(0,
-                                                                  request_body_buffer:length())
-                      request_handle:logWarn(payload_msj)
-                  end
-          
-                  log(request_handle, "START DISPLAYING REQUEST HEADERS")
-                  local log_headers = request_handle:headers()
+            local start_time
+            function version() return "v1" end
+            function log(handle, value) handle:logWarn(version() .. ': ' .. value) end
+            
+            -- dump a lua object into a string for logging
+            function dump(o)
+                if type(o) == 'table' then
+                    local s = '{ '
+                    for k, v in pairs(o) do
+                        if type(k) ~= 'number' then k = '"' .. k .. '"' end
+                        s = s .. '[' .. k .. '] = ' .. dump(v) .. ','
+                    end
+                    return s .. '} '
+                else
+                    return tostring(o)
+                end
+            end
+            
+            function replace_vars(s, variable_list)
+                -- Allow replace_vars{str, vars} syntax as well as replace_vars(str, {vars})
+                if not variable_list then return s end
+                local f = function(x)
+                    return tostring(variable_list[x] or variable_list[tonumber(x)] or "{" .. x .. "}")
+                end
+                return (s:gsub("<(.-)>", f))
+            end
+            
+            function envoy_on_request(request_handle)
+            
+                function try(f, catch_f)
+                    local status, exception = pcall(f)
+                    if not status then catch_f(exception) end
+                end
+                try(function()
+            
+                    start_time = os.clock()
+            
+                    local body = request_handle:body()
+                    request_handle:logWarn(type(body))
+            
+                    local payload_msj
+            
+                    request_body_buffer = request_handle:body()
+                    if (request_body_buffer == nil) then
+                        -- nil boby
+                       
+                        else
+                            payload_msj = request_body_buffer:getBytes(0,
+                                                                        request_body_buffer:length())
+                            request_handle:logDebug(payload_msj)
+                    end
+            
+                    log(request_handle, "START DISPLAYING REQUEST HEADERS")
+                    local log_headers = request_handle:headers()
 
-                  headers_str = ""
+                    headers_str = ""
 
-                  for key, value in pairs(log_headers) do
-          
-                      log(request_handle, "header key: " .. dump(key) ..
-                              ", header value: " .. dump(value))
+                    print("================== header logs ==========================")
 
-                      headers_str = headers_str..', "'..dump(key)..'":"'..dump(value)..'"'
+                    for key, value in pairs(log_headers) do
+            
+                        log(request_handle, "header key: " .. dump(key) ..
+                                ", header value: " .. dump(value))
 
-                      if (tostring(key) == "x-b3-traceid") then
-                          trace_id = dump(value)
-                          request_handle:logDebug("==============Trace ID================" .. tostring(key) .."   " .. dump(value))
-                      else
-          
-                      end
-                      if (tostring(key) == "x-b3-spanid") then
-                          span_id = dump(value)
-                          request_handle:logDebug("==============SPAN ID================" .. tostring(key) .."   " .. dump(value))
-                      else
-          
-                      end
-                      if (tostring(key) == "x-request-id") then
-                          request_id = tostring(value)
-                          request_id = request_id:gsub("%-", "")
-                          request_sub = request_id:sub(1, 16)
-          
-                          request_handle:logDebug("==============request_id================" .. tostring(key) .."   " .. request_sub)
-                      else
-          
-                      end
-          
-                  end
-                  log(request_handle, "END DISPLAYING REQUEST HEADERS")
-                  timestamp_micro = os.time() .. "000000"
-          
-                  request_handle:logDebug("==========  TIME Microseconds =========" .. os.time() .. "000000")
-          
-                  duration = os.clock() - start_time
-                  microsecs = math.floor(duration * 1000000)
-                  request_handle:logDebug("==============Duration================" .. duration)
-                  request_handle:logDebug("==============Duration Microseconds ================" .. microsecs)
-          
-                  id_number = request_sub
-          
-                  request_handle:logDebug("=========== ID ===============" .. id_number)
-                  -- print("=========== Payload ===========".. (payload_msj or "none") )
-                  -- nonamp_payload= nonquoted_payload:gsub( '\&', "\\&")
-                  -- payload limit 65520 characters jaeger max length string 
-                  if (payload_msj:len() > 65521) then
-                      payload_msj = payload_msj:sub(1, 65520)
-                  end
-                  request_handle:logDebug("=========== Payload Len after Check ========= " .. payload_msj:len())
-                  
-                  -- escape special characters for json array
-                  clean_payload = payload_msj:gsub("\\", "\\\\")
-                  nonr_payload = clean_payload:gsub("[\r]", "")
-                  nonquoted_payload = nonr_payload:gsub('"', '\\"')
-                  escaped_payload = nonquoted_payload:gsub("[\n]", "\\n")
-          
-                  variable_list = {
-                      idNumber = id_number,
-                      traceId = trace_id,
-                      parentId = (span_id or "null"),
-                      timestamp = timestamp_micro,
-                      duration = microsecs,
-                      body = escaped_payload,
-                      headers = headers_str
+                        headers_str = headers_str..', "'..dump(key)..'":"'..dump(value)..'"'
 
-                  }
-                  -- span info for 
-                  json_span = [[
-                                [
-                                    {
-                                        "id": "<idNumber>",
-                                        "traceId": "<traceId>",
-                                        "parentId": "<parentId>",
-                                        "name": "payload request",
-                                        "timestamp": <timestamp>,
-                                        "duration": <duration>,
-                                        "kind": "SERVER",
-                                        "tags": {
-                                            "http.payload": "<body>",
-                                            <headers>
+                        if (tostring(key) == "x-b3-traceid") then
+                            trace_id = dump(value)
+                            --request_handle:logDebug("==============Trace ID================" .. tostring(key) .."   " .. dump(value))
+                        else
+            
+                        end
+                        if (tostring(key) == "x-b3-spanid") then
+                            span_id = dump(value)
+                            --request_handle:logDebug("==============SPAN ID================" .. tostring(key) .."   " .. dump(value))
+                        else
+            
+                        end
+                        if (tostring(key) == "x-request-id") then
+                            request_id = tostring(value)
+                            request_id = request_id:gsub("%-", "")
+                            request_sub = request_id:sub(1, 16)
+            
+                            --request_handle:logDebug("==============request_id================" .. tostring(key) .."   " .. request_sub)
+                        else
+            
+                        end
+            
+                    end
+                    log(request_handle, "END DISPLAYING REQUEST HEADERS")
+                    timestamp_micro = os.time() .. "000000"
+            
+                    --request_handle:logDebug("==========  TIME Microseconds =========" .. os.time() .. "000000")
+            
+                    duration = os.clock() - start_time
+                    microsecs = math.floor(duration * 1000000)
+                    --request_handle:logDebug("==============Duration================" .. duration)
+                    --request_handle:logDebug("==============Duration Microseconds ================" .. microsecs)
+            
+                    id_number = request_sub
+            
+                    --request_handle:logDebug("=========== ID ===============" .. id_number)
+                    -- print("=========== Payload ===========".. (payload_msj or "none") )
+                    -- nonamp_payload= nonquoted_payload:gsub( '\&', "\\&")
+                    -- payload limit 65520 characters jaeger max length string 
+                    if (payload_msj:len() > 65521) then
+                        payload_msj = payload_msj:sub(1, 65520)
+                    end
+                    request_handle:logDebug("=========== Payload Len after Check ========= " .. payload_msj:len())
+                    
+                    print("========= Headers ==========".. headers_str)
+                    -- escape special characters for json array
+                    clean_payload = payload_msj:gsub("\\", "\\\\")
+                    nonr_payload = clean_payload:gsub("[\r]", "")
+                    nonquoted_payload = nonr_payload:gsub('"', '\\"')
+                    escaped_payload = nonquoted_payload:gsub("[\n]", "\\n")
+            
+                    variable_list = {
+                        idNumber = id_number,
+                        traceId = trace_id,
+                        parentId = (span_id or "null"),
+                        timestamp = timestamp_micro,
+                        duration = microsecs,
+                        body = escaped_payload,
+                        headers = headers_str
+
+                    }
+                    -- span info for 
+                    json_span = [[
+                                    [
+                                        {
+                                            "id": "<idNumber>",
+                                            "traceId": "<traceId>",
+                                            "parentId": "<parentId>",
+                                            "name": "payload request",
+                                            "timestamp": <timestamp>,
+                                            "duration": <duration>,
+                                            "kind": "SERVER",
+                                            "tags": {
+                                                "http.payload": "<body>"
+                                                <headers>
+                                            }
                                         }
-                                    }
-                                ]    
-                              ]]
-          
-                  span_info = replace_vars(json_span, variable_list)
-          
-                  request_handle:logDebug("===========SPAN JSON==============" .. dump(span_info))
-          
-                  local headers, res = request_handle:httpCall("jaeger_cluster", {
-                      [":method"] = "POST",
-                      [":path"] = "/api/v2/spans",
-                      [":authority"] = "jaeger_cluster",
-                      ["Content-Type"] = "application/json"
-                  }, span_info, 5000)
-          
-                  print("== headers=====" .. dump(headers))
-                  print("== res=====" .. dump(res))
-          
-              end, function(e)
-                  request_handle:logWarn("Error en el procesamiento del payload")
-                  request_handle:logWarn(error(e))
-              end)
-          
-          end
-          function envoy_on_response(response_handle)
-              log(response_handle, "START DISPLAYING RESPONSE HEADERS")
-              local log_headers = response_handle:headers()
-              for key, value in pairs(log_headers) do
-                  log(response_handle,
-                      "header key: " .. dump(key) .. ", header value: " .. dump(value))
-          
-              log(response_handle, "END DISPLAYING RESPONSE HEADERS")
-              
-              local function is_not_empty(s) return s ~= nil end
-              local body = response_handle:body()
-          
-              if is_not_empty(body) then
-                  result = tostring(body)
-                  response_handle:logWarn(result)
-              end
-              response_handle:logWarn(" ========= XXXXX ========== ")
-          end
+                                    ]    
+                                ]]
+            
+                    span_info = replace_vars(json_span, variable_list)
+            
+                    request_handle:logDebug("===========SPAN JSON==============" .. dump(span_info))
+            
+                    local headers, res = request_handle:httpCall("jaeger_cluster", {
+                        [":method"] = "POST",
+                        [":path"] = "/api/v2/spans",
+                        [":authority"] = "jaeger_cluster",
+                        ["Content-Type"] = "application/json"
+                    }, span_info, 5000)
+            
+                    print("=== Headers Jaeger ====" .. dump(headers))
+                    print("=== Response Jaeger ====" .. dump(res))
+            
+                end, function(e)
+                    request_handle:logWarn("Error en el procesamiento del payload")
+                    request_handle:logWarn(error(e))
+                end)
+            
+            end
+            function envoy_on_response(response_handle)
+                log(response_handle, "START DISPLAYING RESPONSE HEADERS")
+                local log_headers = response_handle:headers()
+                for key, value in pairs(log_headers) do
+                    log(response_handle,
+                        "header key: " .. dump(key) .. ", header value: " .. dump(value))
+                end     
+                log(response_handle, "END DISPLAYING RESPONSE HEADERS")
+                
+                local function is_not_empty(s) return s ~= nil end
+                local body = response_handle:body()
+            
+                if is_not_empty(body) then
+                    result = tostring(body)
+                    response_handle:logWarn(result)
+                end
+            end
          
