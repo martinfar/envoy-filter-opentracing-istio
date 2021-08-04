@@ -148,28 +148,24 @@ spec:
                         if (tostring(key) == "x-b3-traceid") then
                             trace_id = dump(value)
                             request_handle:logDebug("==============Trace ID================" .. tostring(key) .."   " .. dump(value))
-                        else
                         end
 
                         if (tostring(key) == "x-b3-spanid") then
                             span_id = dump(value)
                             request_handle:logDebug("==============SPAN ID================" .. tostring(key) .."   " .. dump(value))
-                        else
+                        end
 
                         if (tostring(key) == ":authority") then
                             service_id = dump(value)
                             request_handle:logDebug("============== service_id ================" .. tostring(key) .."   " .. dump(value))
-                        else
-            
                         end
+
                         if (tostring(key) == "x-request-id") then
                             request_id = tostring(value)
                             request_id = request_id:gsub("%-", "")
                             request_sub = request_id:sub(1, 16)
             
                             request_handle:logDebug("==============request_id================" .. tostring(key) .."   " .. request_sub)
-                        else
-            
                         end
             
                     end
@@ -223,7 +219,7 @@ spec:
                                             "kind": "SERVER",
                                             "localEndpoint": {
                                                 "serviceName": "<service_id>"
-                                              }                                            
+                                              },                                            
                                             "tags": {
                                                 "http.payload": "<body>"
                                                 <headers>
