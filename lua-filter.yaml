@@ -4,10 +4,10 @@ metadata:
   name: lua-filter
   namespace: demo1
 spec:
-  workloadSelector:
-    labels:
+  #workloadSelector:
+   # labels:
       #istio: ingressgateway
-      app: productpage
+    #  app: productpage
   configPatches:
   - applyTo: CLUSTER
     match:
@@ -73,6 +73,15 @@ spec:
                 else
                     return tostring(o)
                 end
+            end
+
+            function uuid()
+                local template ='xxxxxxxxxxxxxxxx'
+                math.randomseed(os.clock()^5)
+                return string.gsub(template, '[xy]', function (c)
+                    local v = (c == 'x') and math.random(0, 0xf) or math.random(8, 0xb)
+                    return string.format('%x', v)
+                end)
             end
 
             function escape_string(str_msj)
@@ -189,21 +198,24 @@ spec:
                         id_number = request_sub    
                     end     
                     
+
+                    
+
+
+                    print("  ============= UUID  =================   "..uuid())
             
                     request_handle:logDebug("=========== ID ===============" .. id_number)
-                    -- print("=========== Payload ===========".. (payload_msj or "none") )
-                    -- nonamp_payload= nonquoted_payload:gsub( '\&', "\\&")
-
             
                     variable_list = {
-                        idNumber = id_number,
+                        idNumber = uuid(),
                         traceId = trace_id,
                         parentId = (span_id or "null"),
                         timestamp = timestamp_micro,
                         duration = microsecs,
                         body = (escaped_payload or "none"),
                         headers = headers_str,
-                        service_id = service_id
+                        service_id = service_id,
+                        name_span= "request_payload_"..id_number:sub(1,4)
 
                     }
                     -- span info for 
@@ -213,7 +225,7 @@ spec:
                                             "id": "<idNumber>",
                                             "traceId": "<traceId>",
                                             "parentId": "<parentId>",
-                                            "name": "payload request",
+                                            "name": "<name_span>",
                                             "timestamp": <timestamp>,
                                             "duration": <duration>,
                                             "kind": "SERVER",
