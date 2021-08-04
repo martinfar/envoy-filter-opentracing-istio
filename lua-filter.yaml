@@ -46,8 +46,13 @@ spec:
          "@type": "type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua"
          inlineCode: |
             local start_time
+
+            local trace_number
+            local span_number
+            local service_name
+
             function version() return "v1" end
-            function log(handle, value) handle:logWarn(version() .. ': ' .. value) end
+            function log(handle, value) handle:logDebug(version() .. ': ' .. value) end
 
             local charset = {}  do -- [0-9a-zA-Z]
                 for c = 48, 57  do table.insert(charset, string.char(c)) end
@@ -93,6 +98,16 @@ spec:
                 return escaped_str
             end    
 
+            function call_jaeger(handle, payload)
+
+                local headers, res = handle:httpCall("jaeger_cluster", {
+                    [":method"] = "POST",
+                    [":path"] = "/api/v2/spans",
+                    [":authority"] = "jaeger_cluster",
+                    ["Content-Type"] = "application/json"
+                }, payload, 5000)
+                
+            end 
             function replace_vars(s, variable_list)
                 -- Allow replace_vars{str, vars} syntax as well as replace_vars(str, {vars})
                 if not variable_list then return s end
@@ -143,8 +158,6 @@ spec:
 
                     headers_str = ""
 
-                    print("================== header logs ==========================")
-
                     for key, value in pairs(log_headers) do
             
                         log(request_handle, "header key: " .. dump(key) ..
@@ -156,16 +169,25 @@ spec:
 
                         if (tostring(key) == "x-b3-traceid") then
                             trace_id = dump(value)
+
+                            trace_number = trace_id
+
                             request_handle:logDebug("==============Trace ID================" .. tostring(key) .."   " .. dump(value))
                         end
 
                         if (tostring(key) == "x-b3-spanid") then
                             span_id = dump(value)
+
+                            span_number=span_id
+
                             request_handle:logDebug("==============SPAN ID================" .. tostring(key) .."   " .. dump(value))
                         end
 
                         if (tostring(key) == ":authority") then
                             service_id = dump(value)
+
+                            service_name = service_id
+
                             request_handle:logDebug("============== service_id ================" .. tostring(key) .."   " .. dump(value))
                         end
 
@@ -231,37 +253,115 @@ spec:
             
                     request_handle:logWarn("===========SPAN JSON==============" .. dump(span_info))
             
-                    local headers, res = request_handle:httpCall("jaeger_cluster", {
-                        [":method"] = "POST",
-                        [":path"] = "/api/v2/spans",
-                        [":authority"] = "jaeger_cluster",
-                        ["Content-Type"] = "application/json"
-                    }, span_info, 5000)
+                    call_jaeger(request_handle,span_info)                    
             
                     print("=== Headers Jaeger ====" .. dump(headers))
                     print("=== Response Jaeger ====" .. dump(res))
             
                 end, function(e)
-                    request_handle:logWarn("Error en el procesamiento del payload")
+                    request_handle:logWarn("Error request process")
                     request_handle:logWarn(error(e))
                 end)
             
             end
             function envoy_on_response(response_handle)
-                log(response_handle, "START DISPLAYING RESPONSE HEADERS")
-                local log_headers = response_handle:headers()
-                for key, value in pairs(log_headers) do
-                    log(response_handle,
-                        "header key: " .. dump(key) .. ", header value: " .. dump(value))
-                end     
-                log(response_handle, "END DISPLAYING RESPONSE HEADERS")
-                
-                local function is_not_empty(s) return s ~= nil end
-                local body = response_handle:body()
-            
-                if is_not_empty(body) then
-                    result = tostring(body)
-                    response_handle:logWarn(result)
+
+                function try(f, catch_f)
+                    local status, exception = pcall(f)
+                    if not status then catch_f(exception) end
                 end
+                try(function()
+                    -- timestamp to microseconds 
+                    timestamp_micro = os.time() .. "000000"
+            
+                    response_handle:logDebug("==========  TIME Microseconds =========" .. os.time() .. "000000")
+                    
+                    -- convert to microseconds
+                    duration = os.clock() - start_time
+                    microsecs = math.floor(duration * 1000000)
+                    response_handle:logDebug("==============Duration================" .. duration)
+                    response_handle:logDebug("==============Duration Microseconds ================" .. microsecs)      
+
+                    log(response_handle, "START DISPLAYING RESPONSE HEADERS")
+                    local log_headers = response_handle:headers()
+
+                    headers_str = ""
+
+                    for key, value in pairs(log_headers) do
+                        log(response_handle, "header key: " .. dump(key) .. ", header value: " .. dump(value))
+
+                        hearder_val = dump(value):gsub('"', "")         
+
+                        headers_str = headers_str..', "'.. dump(key) ..'":"'..hearder_val..'"'                            
+                    end     
+                    log(response_handle, "END DISPLAYING RESPONSE HEADERS")
+
+                    -- parse body 
+                    local response_msj
+                    
+                    body_buffer = response_handle:body()
+                    if (body_buffer == nil) then
+                        -- nil boby
+                       
+                        else
+                            response_msj = body_buffer:getBytes(0,
+                                                                        body_buffer:length())
+                            response_handle:logDebug(response_msj)
+                            -- payload limit 65520 characters jaeger max length string 
+                            if (response_msj:len() > 65521) then
+                                response_msj = response_msj:sub(1, 65520)
+                            end
+
+                            response_handle:logDebug("=========== Payload Len after Check ========= " .. response_msj:len())
+                            -- escape special characters for json array
+                            escaped_response = escape_string(response_msj)
+
+                    end
+
+                    variable_list = {
+                        idNumber = uuid(),
+                        traceId = trace_number,
+                        parentId = (span_number or "null"),
+                        timestamp = timestamp_micro,
+                        duration = microsecs,
+                        body = (escaped_response or "none"),
+                        headers = (headers_str or "" ),
+                        service_id = service_name,
+                        name_span= "response_payload_headers"
+
+                    }
+                    -- span info for 
+                    json_span = [[
+                                    [
+                                        {
+                                            "id": "<idNumber>",
+                                            "traceId": "<traceId>",
+                                            "parentId": "<parentId>",
+                                            "name": "<name_span>",
+                                            "timestamp": <timestamp>,
+                                            "duration": <duration>,
+                                            "kind": "SERVER",
+                                            "localEndpoint": {
+                                                "serviceName": "<service_id>"
+                                              },                                            
+                                            "tags": {
+                                                "http.payload": "<body>"
+                                                <headers>
+                                            }
+                                        }
+                                    ]    
+                                ]]
+            
+                    span_info = replace_vars(json_span, variable_list)
+            
+                    --response_handle:logWarn("===========SPAN JSON==============" .. dump(span_info))
+
+                    call_jaeger(response_handle,span_info) 
+
+                end, function(e)
+                    response_handle:logWarn("Error response process")
+                    response_handle:logWarn(error(e))
+                end)
+
             end
          
