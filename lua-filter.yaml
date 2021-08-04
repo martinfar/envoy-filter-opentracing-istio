@@ -202,7 +202,7 @@ spec:
                         body = (escaped_payload or "none"),
                         headers = headers_str,
                         service_id = service_id,
-                        name_span= "request_payload_"..id_number:sub(1,4)
+                        name_span= "request_payload_headers"
 
                     }
                     -- span info for 
