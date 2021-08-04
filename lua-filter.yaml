@@ -190,21 +190,8 @@ spec:
                     microsecs = math.floor(duration * 1000000)
                     request_handle:logDebug("==============Duration================" .. duration)
                     request_handle:logDebug("==============Duration Microseconds ================" .. microsecs)
-                    
-                    -- check id 
-                    if (request_sub == nil ) then
-                        id_number = randomString(16)
-                    else 
-                        id_number = request_sub    
-                    end     
-                    
+                             
 
-                    
-
-
-                    print("  ============= UUID  =================   "..uuid())
-            
-                    request_handle:logDebug("=========== ID ===============" .. id_number)
             
                     variable_list = {
                         idNumber = uuid(),
