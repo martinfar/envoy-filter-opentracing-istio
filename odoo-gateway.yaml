@@ -1,0 +1,36 @@
+kind: Gateway
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: odoo-gateway
+  namespace: demo1
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - hosts:
+        - odoo.kub.vatrox.ml
+      port:
+        name: http
+        number: 80
+        protocol: HTTP
+        
+---
+kind: VirtualService
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: odoo
+  namespace: demo1
+spec:
+  gateways:
+    - odoo-gateway
+  hosts:
+    - '*'
+  http:
+    - match:
+        - uri:
+            exact: /
+      route:
+        - destination:
+            host: labarra-odoo
+            port:
+              number: 80

@@ -1,0 +1,22 @@
+kind: Ingress
+apiVersion: extensions/v1beta1
+metadata:
+  name: products-ingress
+  namespace: istio-system
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-http
+spec:
+  tls:
+    - hosts:
+        - products.kub.vatrox.ml
+      secretName: products-tls
+  rules:
+    - host: products.kub.vatrox.ml
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              serviceName: istio-ingressgateway
+              servicePort: 80
